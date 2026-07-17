@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Инструмент золотых прожилок</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <p class="eyebrow">Версия 2.0</p>
+      <h1>Инструмент золотых прожилок</h1>
+      <p>Загрузите изображение алкогольных чернил или мрамора, выделите декоративные металлические прожилки и экспортируйте чистую маску для тиснения фольгой.</p>
+    </header>
+
+    <section class="panel controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Настройки обработки</h2>
+      <label class="upload-box" for="image-upload" title="Можно загрузить одно изображение JPG или PNG">
+        <span>Выберите JPG или PNG</span>
+        <input id="image-upload" type="file" accept="image/png,image/jpeg" />
+      </label>
+
+      <div class="control-grid">
+        <label title="Выберите, какие металлические элементы считать полезным результатом">
+          Режим обработки
+          <select id="processing-mode">
+            <option value="fine">Тонкие прожилки</option>
+            <option value="balanced" selected>Прожилки + брызги</option>
+            <option value="large">Крупные металлические фрагменты</option>
+          </select>
+        </label>
+        <label title="Более высокое значение включает больше приглушённых золотых участков">
+          Чувствительность к золоту
+          <input id="sensitivity" type="range" min="0" max="100" value="58" />
+          <output id="sensitivity-value">58</output>
+        </label>
+        <label title="Соединяет небольшие разрывы в прожилках">
+          Соединение разрывов
+          <input id="connect-gaps" type="range" min="0" max="100" value="45" />
+          <output id="connect-gaps-value">45</output>
+        </label>
+        <label title="Удаляет одиночный шум, сохраняя вытянутые прожилки">
+          Очистка шума
+          <input id="noise-cleanup" type="range" min="0" max="100" value="45" />
+          <output id="noise-cleanup-value">45</output>
+        </label>
+        <label title="Упрощает векторные контуры без удаления тонких ветвей">
+          Сглаживание вектора
+          <input id="vector-smoothing" type="range" min="0" max="100" value="35" />
+          <output id="vector-smoothing-value">35</output>
+        </label>
+      </div>
+
+      <div class="toolbar" aria-label="Действия">
+        <button id="reset" type="button">Сбросить настройки</button>
+        <button id="download-png" type="button" disabled>Скачать PNG</button>
+        <button id="download-svg" type="button" disabled>Скачать SVG</button>
+      </div>
+      <p id="status" role="status">Загрузите изображение, чтобы построить маску.</p>
+    </section>
+
+    <section class="panel preview-controls" aria-labelledby="preview-title">
+      <h2 id="preview-title">Предпросмотр</h2>
+      <div class="segmented" role="group" aria-label="Режим предпросмотра">
+        <button class="preview-mode is-active" type="button" data-preview="original">Исходник</button>
+        <button class="preview-mode" type="button" data-preview="mask">Маска</button>
+        <button class="preview-mode" type="button" data-preview="overlay">Наложение</button>
+      </div>
+    </section>
+
+    <section class="preview-grid" aria-label="Область предпросмотра">
+      <figure class="panel preview-card">
+        <figcaption id="preview-caption">Исходник</figcaption>
+        <canvas id="preview-canvas"></canvas>
+      </figure>
+      <figure class="panel preview-card">
+        <figcaption>Маска для экспорта</figcaption>
+        <canvas id="mask-canvas"></canvas>
+      </figure>
+    </section>
+  </main>
+
+  <script src="src/processing.js"></script>
+  <script src="src/exporters.js"></script>
+  <script src="src/preview.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
