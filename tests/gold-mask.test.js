@@ -1,28 +1,41 @@
 const assert = require('node:assert/strict');
-const { createGoldMask, isGoldPixel } = require('../src/goldMask');
+const { processVeins, goldProbabilityForPixel } = require('../src/processing');
+const { createSvg } = require('../src/exporters');
 
 function imageData(width, height, pixels) {
   return { width, height, data: new Uint8ClampedArray(pixels.flat()) };
 }
+function px(r, g, b, a = 255) { return [r, g, b, a]; }
 
-assert.equal(isGoldPixel(218, 166, 52, 55), true, 'warm metallic gold should be detected');
-assert.equal(isGoldPixel(25, 26, 28, 55), false, 'neutral dark colors should not be detected');
-assert.equal(isGoldPixel(230, 230, 230, 80), false, 'white paper/background should not be detected');
+assert.ok(goldProbabilityForPixel(218, 166, 52) > goldProbabilityForPixel(230, 230, 230), 'gold should score above white');
+assert.ok(goldProbabilityForPixel(218, 166, 52) > goldProbabilityForPixel(35, 40, 80), 'gold should score above blue/dark color');
 
-const sample = imageData(3, 2, [
-  [220, 170, 40, 255], [225, 176, 58, 255], [245, 245, 240, 255],
-  [32, 30, 35, 255], [210, 160, 42, 255], [40, 80, 170, 255],
+const thinVein = imageData(7, 3, [
+  px(245,245,245), px(245,245,245), px(245,245,245), px(220,170,45), px(245,245,245), px(245,245,245), px(245,245,245),
+  px(245,245,245), px(220,170,45), px(220,170,45), px(221,171,46), px(220,170,45), px(220,170,45), px(245,245,245),
+  px(245,245,245), px(245,245,245), px(245,245,245), px(220,170,45), px(245,245,245), px(245,245,245), px(245,245,245),
 ]);
-const mask = createGoldMask(sample, { sensitivity: 55, minFragmentSize: 1 });
-assert.equal(mask.detectedPixels, 3, 'three gold pixels should be detected');
-assert.deepEqual(Array.from(mask.data.slice(0, 12)), [0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255]);
+const veinResult = processVeins(thinVein, { mode: 'fine', sensitivity: 55, connectGaps: 35, noiseCleanup: 20 });
+assert.ok(veinResult.detectedPixels >= 7, 'thin connected veins should be preserved');
 
-const filtered = createGoldMask(sample, { sensitivity: 55, minFragmentSize: 4 });
-assert.equal(filtered.detectedPixels, 0, 'small disconnected fragments should be removed');
+const noisy = imageData(6, 4, [
+  px(245,245,245), px(218,166,52), px(245,245,245), px(245,245,245), px(245,245,245), px(245,245,245),
+  px(245,245,245), px(245,245,245), px(245,245,245), px(218,166,52), px(218,166,52), px(218,166,52),
+  px(245,245,245), px(245,245,245), px(245,245,245), px(218,166,52), px(218,166,52), px(218,166,52),
+  px(245,245,245), px(245,245,245), px(245,245,245), px(218,166,52), px(218,166,52), px(218,166,52),
+]);
+const clean = processVeins(noisy, { mode: 'balanced', sensitivity: 55, connectGaps: 0, noiseCleanup: 20 });
+assert.equal(clean.mask[1], 0, 'isolated warm noise should be removed');
+assert.ok(clean.detectedPixels >= 9, 'larger metallic fragments should remain');
 
-const lenient = createGoldMask(imageData(1, 1, [[130, 100, 55, 255]]), { sensitivity: 100, minFragmentSize: 1 });
-const strict = createGoldMask(imageData(1, 1, [[130, 100, 55, 255]]), { sensitivity: 0, minFragmentSize: 1 });
-assert.equal(lenient.detectedPixels, 1, 'higher sensitivity should include muted gold');
-assert.equal(strict.detectedPixels, 0, 'lower sensitivity should exclude muted gold');
+for (let i = 0; i < veinResult.mask.length; i += 1) {
+  if (!veinResult.mask[i]) assert.equal(veinResult.transparentImageData.data[i * 4 + 3], 0, 'PNG background must be transparent');
+}
 
-console.log('Gold mask detection tests passed.');
+const svg = createSvg(veinResult, { vectorSmoothing: 35 });
+assert.match(svg, /^<svg /, 'SVG should be generated');
+assert.match(svg, /<path /, 'SVG should contain vector paths');
+assert.doesNotMatch(svg, /<image|data:image\/png|<rect/i, 'SVG must not contain raster image or background rectangle');
+assert.match(svg, /viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
+
+console.log('Gold vein processing tests passed.');

@@ -1,56 +1,55 @@
-# Gold Vein Mask Tool
+# Инструмент золотых прожилок
 
-A first browser-based prototype for processing abstract marble and alcohol-ink images. It detects gold-toned / metallic-gold areas and turns them into a downloadable black-and-white PNG mask: detected gold pixels become solid black and all other pixels become pure white.
+Браузерный инструмент для извлечения декоративных металлических прожилок из изображений алкогольных чернил / мрамора. Версия 2.0 делает упор не на поиск каждого золотого пикселя, а на получение чистых непрерывных органических структур для тиснения фольгой и дальнейшего редактирования.
 
-## Prototype features
+## Возможности
 
-- Upload one JPG or PNG image from your computer.
-- Preview the original image and generated mask side by side.
-- Tune **Gold color sensitivity** to include fewer or more warm metallic tones.
-- Tune **Minimum fragment size** to remove tiny isolated detections.
-- Download the generated mask as a PNG.
+- Загрузка одного JPG или PNG изображения.
+- Многоэтапная обработка: карта вероятности золота, соединение разрывов, очистка шума и сохранение тонких прожилок.
+- Простые настройки: режим обработки, чувствительность к золоту, соединение разрывов, очистка шума и сглаживание вектора.
+- Предпросмотр исходника, маски и наложения маски на изображение.
+- Экспорт PNG с чёрными прожилками и настоящим прозрачным фоном.
+- Экспорт SVG с редактируемыми векторными path-контурами без встроенного PNG и без фонового прямоугольника.
 
-Background reconstruction is intentionally not implemented in this prototype.
+## Запуск локально
 
-## Launch locally
-
-This project is a static web app with no required build step.
+Проект остаётся статическим приложением без обязательной сборки.
 
 ```bash
 npm start
 ```
 
-Then open <http://localhost:4173> in your browser.
+Затем откройте <http://localhost:4173> в браузере.
 
-If you prefer not to use npm, you can launch the same static server directly:
+Альтернативный запуск без npm:
 
 ```bash
 python3 -m http.server 4173
 ```
 
+## Публикация
 
-## Public deployment
+Репозиторий настроен для GitHub Pages через `.github/workflows/pages.yml`.
 
-This repository is configured for GitHub Pages through `.github/workflows/pages.yml`. To publish the static preview:
+1. В настройках репозитория GitHub откройте **Settings → Pages**.
+2. Установите **Source** в **GitHub Actions**.
+3. Выполните push или merge в `main`, либо запустите workflow **Deploy static site to GitHub Pages** вручную.
+4. Откройте URL из summary workflow. Обычно он выглядит как `https://<owner>.github.io/gold-vein-tool/`.
 
-1. In the GitHub repository, open **Settings → Pages**.
-2. Set **Source** to **GitHub Actions**.
-3. Push or merge changes to `main`, or run the **Deploy static site to GitHub Pages** workflow manually.
-4. Open the Pages URL shown in the workflow summary. It typically uses the format `https://<owner>.github.io/gold-vein-tool/`.
+## Проверка
 
-## Verify the prototype
-
-Run the unit tests for the gold detection and mask-generation logic:
+Запуск автоматических тестов:
 
 ```bash
 npm test
 ```
 
-Manual browser check:
+Ручная проверка:
 
-1. Start the app with `npm start`.
-2. Open <http://localhost:4173>.
-3. Upload a JPG or PNG marble / alcohol-ink image.
-4. Confirm the original preview and black-and-white mask appear side by side.
-5. Move the sensitivity and minimum-fragment controls and confirm the mask updates.
-6. Click **Download mask PNG** and confirm a PNG file is saved.
+1. Запустите приложение через `npm start`.
+2. Откройте <http://localhost:4173>.
+3. Загрузите JPG или PNG изображение.
+4. Проверьте режимы предпросмотра: **Исходник**, **Маска**, **Наложение**.
+5. Измените настройки обработки и убедитесь, что маска обновляется.
+6. Скачайте PNG и убедитесь, что фон прозрачный.
+7. Скачайте SVG и убедитесь, что файл содержит редактируемые векторные контуры.
