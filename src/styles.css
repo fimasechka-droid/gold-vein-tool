@@ -1,0 +1,51 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f6efe6;
+  color: #1f1a16;
+}
+
+body { margin: 0; }
+
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  color: #9b6b14;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+h1 { font-size: clamp(2.2rem, 6vw, 4.5rem); margin: 0 0 12px; }
+h2 { margin-top: 0; }
+
+.panel {
+  background: rgba(255,255,255,.84);
+  border: 1px solid rgba(99,70,20,.18);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(52,34,10,.12);
+}
+
+.controls { padding: 24px; margin-bottom: 24px; }
+.upload-box { display: grid; gap: 10px; margin-bottom: 22px; font-weight: 700; }
+.upload-box input { padding: 14px; border: 1px dashed #b88a2f; border-radius: 14px; background: #fffaf1; }
+.control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.control-grid label { display: grid; gap: 8px; font-weight: 700; }
+output { color: #8a5c0d; }
+button { border: 0; border-radius: 999px; padding: 13px 22px; background: #1f1a16; color: white; font-weight: 800; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+
+.preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.preview-card { margin: 0; padding: 18px; }
+figcaption { font-weight: 800; margin-bottom: 12px; }
+canvas { display: block; width: 100%; min-height: 260px; border-radius: 14px; background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 24px 24px; object-fit: contain; }
+
+@media (max-width: 760px) { .preview-grid { grid-template-columns: 1fr; } }
