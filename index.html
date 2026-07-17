@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gold Vein Mask Prototype</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <p class="eyebrow">Abstract marble and alcohol-ink prototype</p>
+      <h1>Gold Vein Mask Tool</h1>
+      <p>Upload one JPG or PNG image, detect gold-toned metallic areas, preview a black-and-white mask, and download the mask as a PNG.</p>
+    </header>
+
+    <section class="panel controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Image and detection controls</h2>
+      <label class="upload-box" for="image-upload">
+        <span>Choose a JPG or PNG image</span>
+        <input id="image-upload" type="file" accept="image/png,image/jpeg" />
+      </label>
+
+      <div class="control-grid">
+        <label>
+          Gold color sensitivity
+          <input id="sensitivity" type="range" min="0" max="100" value="55" />
+          <output id="sensitivity-value">55</output>
+        </label>
+        <label>
+          Minimum fragment size (pixels)
+          <input id="min-fragment" type="range" min="0" max="250" value="24" />
+          <output id="min-fragment-value">24</output>
+        </label>
+      </div>
+
+      <p id="status" role="status">Upload an image to generate a mask.</p>
+      <button id="download" type="button" disabled>Download mask PNG</button>
+    </section>
+
+    <section class="preview-grid" aria-label="Image previews">
+      <figure class="panel preview-card">
+        <figcaption>Original image</figcaption>
+        <canvas id="original-canvas"></canvas>
+      </figure>
+      <figure class="panel preview-card">
+        <figcaption>Gold mask</figcaption>
+        <canvas id="mask-canvas"></canvas>
+      </figure>
+    </section>
+  </main>
+
+  <script src="src/goldMask.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
