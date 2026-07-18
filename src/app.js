@@ -1,7 +1,6 @@
 (function () {
-  const defaults = { mode: 'balanced', sensitivity: 58, connectGaps: 45, noiseCleanup: 45 };
+  const defaults = { sensitivity: 58, connectGaps: 45, noiseCleanup: 45 };
   const upload = document.querySelector('#image-upload');
-  const mode = document.querySelector('#processing-mode');
   const sensitivity = document.querySelector('#sensitivity');
   const connectGaps = document.querySelector('#connect-gaps');
   const noiseCleanup = document.querySelector('#noise-cleanup');
@@ -26,7 +25,6 @@
   function setOutput(id, value) { document.querySelector(id).value = value; }
   function options() {
     return {
-      mode: mode.value,
       sensitivity: Number(sensitivity.value),
       connectGaps: Number(connectGaps.value),
       noiseCleanup: Number(noiseCleanup.value),
@@ -137,7 +135,6 @@
     image.src = objectUrl;
   }
   function resetSettings() {
-    mode.value = defaults.mode;
     sensitivity.value = defaults.sensitivity;
     connectGaps.value = defaults.connectGaps;
     noiseCleanup.value = defaults.noiseCleanup;
@@ -146,7 +143,7 @@
   }
 
   upload.addEventListener('change', function (event) { loadFile(event.target.files[0]); });
-  [mode, sensitivity, connectGaps, noiseCleanup].forEach(function (control) {
+  [sensitivity, connectGaps, noiseCleanup].forEach(function (control) {
     control.addEventListener('input', function () { updateLabels(); processImage(); });
   });
   reset.addEventListener('click', resetSettings);

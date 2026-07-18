@@ -12,7 +12,6 @@
       sensitivity: options?.sensitivity,
       noiseCleanup: options?.minFragmentSize ?? options?.noiseCleanup,
       connectGaps: options?.connectGaps ?? 0,
-      mode: options?.mode || 'balanced',
     });
     return {
       width: result.width,

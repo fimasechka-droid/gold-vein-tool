@@ -1,10 +1,4 @@
 (function (global) {
-  const MODE_PRESETS = {
-    fine: { minArea: 2, minSpan: 3, bridgeBoost: 1.25, splashRadius: 1 },
-    balanced: { minArea: 5, minSpan: 5, bridgeBoost: 1, splashRadius: 2 },
-    large: { minArea: 18, minSpan: 9, bridgeBoost: 0.75, splashRadius: 1 },
-  };
-
   function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
 
   function rgbToHsv(r, g, b) {
@@ -144,16 +138,14 @@
     return output;
   }
 
-  function closeGaps(mask, width, height, connectGaps, mode) {
-    const preset = MODE_PRESETS[mode] || MODE_PRESETS.balanced;
-    const radius = Math.round((clamp(connectGaps, 0, 100) / 100) * 2 * preset.bridgeBoost);
+  function closeGaps(mask, width, height, connectGaps) {
+    const radius = Math.round((clamp(connectGaps, 0, 100) / 100) * 2);
     if (radius <= 0) return new Uint8Array(mask);
     return erode(dilate(mask, width, height, radius), width, height, Math.max(1, radius - 1));
   }
 
-  function cleanupComponents(mask, probability, width, height, noiseCleanup, mode) {
-    const preset = MODE_PRESETS[mode] || MODE_PRESETS.balanced;
-    const minArea = Math.round(preset.minArea + clamp(noiseCleanup, 0, 100) * 0.22);
+  function cleanupComponents(mask, probability, width, height, noiseCleanup) {
+    const minArea = Math.round(5 + clamp(noiseCleanup, 0, 100) * 0.22);
     const output = new Uint8Array(mask.length);
     const visited = new Uint8Array(mask.length);
     const queue = [];
@@ -184,7 +176,7 @@
       }
 
       const span = Math.max(maxX - minX + 1, maxY - minY + 1);
-      const thinDecorative = span >= preset.minSpan && component.length >= Math.max(2, minArea * 0.35);
+      const thinDecorative = span >= 5 && component.length >= Math.max(2, minArea * 0.35);
       const confident = score / component.length > 0.66 && component.length >= Math.max(2, minArea * 0.45);
       const keep = component.length >= minArea || thinDecorative || confident;
       if (keep) for (const index of component) output[index] = 1;
@@ -193,10 +185,8 @@
     return output;
   }
 
-  function keepNearbySplashes(cleanMask, rawMask, width, height, mode) {
-    const preset = MODE_PRESETS[mode] || MODE_PRESETS.balanced;
-    if (preset.splashRadius <= 0) return cleanMask;
-    const grown = dilate(cleanMask, width, height, preset.splashRadius);
+  function keepNearbyRawPixels(cleanMask, rawMask, width, height) {
+    const grown = dilate(cleanMask, width, height, 2);
     const output = new Uint8Array(cleanMask);
     for (let index = 0; index < rawMask.length; index += 1) {
       if (rawMask[index] && grown[index]) output[index] = 1;
@@ -224,9 +214,9 @@
     const { width, height } = imageData;
     const probability = createProbabilityMap(imageData);
     const rawMask = thresholdProbability(probability, width, height, opts);
-    const connectedMask = closeGaps(rawMask, width, height, opts.connectGaps ?? 45, opts.mode || 'balanced');
-    const cleanMask = cleanupComponents(connectedMask, probability, width, height, opts.noiseCleanup ?? 45, opts.mode || 'balanced');
-    const finalMask = keepNearbySplashes(cleanMask, rawMask, width, height, opts.mode || 'balanced');
+    const connectedMask = closeGaps(rawMask, width, height, opts.connectGaps ?? 45);
+    const cleanMask = cleanupComponents(connectedMask, probability, width, height, opts.noiseCleanup ?? 45);
+    const finalMask = keepNearbyRawPixels(cleanMask, rawMask, width, height);
     const detectedPixels = finalMask.reduce((sum, value) => sum + value, 0);
     return {
       width,

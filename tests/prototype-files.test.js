@@ -3,15 +3,26 @@ const fs = require('node:fs');
 
 const html = fs.readFileSync('index.html', 'utf8');
 const app = fs.readFileSync('src/app.js', 'utf8');
+const processing = fs.readFileSync('src/processing.js', 'utf8');
 const exporters = fs.readFileSync('src/exporters.js', 'utf8');
 const styles = fs.readFileSync('src/styles.css', 'utf8');
 
-['Режим обработки', 'Тонкие прожилки', 'Прожилки + брызги', 'Крупные металлические фрагменты', 'Чувствительность к золоту', 'Соединение разрывов', 'Очистка шума', 'Сбросить настройки', 'Исходник', 'Маска', 'Наложение', 'Скачать PNG', 'Скачать SVG', 'Масштаб', '50%', '100%', '200%', '400%', 'Fit'].forEach((text) => {
+['Чувствительность к золоту', 'Соединение разрывов', 'Очистка шума', 'Сбросить настройки', 'Исходник', 'Маска', 'Наложение', 'Скачать PNG', 'Скачать SVG', 'Масштаб', '50%', '100%', '200%', '400%', 'Fit'].forEach((text) => {
   assert.ok(html.includes(text), `Russian UI should include: ${text}`);
 });
 assert.doesNotMatch(html, /Original image|Gold color sensitivity|Download mask|Minimum fragment|Overlay|Processing mode/, 'visible UI should not keep old English labels');
 assert.doesNotMatch(html, /Сглаживание вектора|vector-smoothing/, 'vector smoothing control should be removed');
 assert.doesNotMatch(app, /vectorSmoothing|vector-smoothing/, 'app should not keep vector smoothing state or handlers');
+const removedModeTerms = [
+  ['Режим', 'обработки'].join(' '),
+  ['Тонкие', 'прожилки'].join(' '),
+  ['Прожилки', '+', 'брызги'].join(' '),
+  ['Крупные', 'металлические', 'фрагменты'].join(' '),
+  ['processing', 'mode'].join('-'),
+];
+removedModeTerms.forEach((term) => assert.ok(!html.includes(term), `removed mode term should not remain: ${term}`));
+assert.ok(!app.includes(removedModeTerms[4]) && !app.includes('mode.value'), 'app should always use the single default processing behavior');
+assert.ok(!processing.includes(['MODE', 'PRESETS'].join('_')) && !/\bmode\b/.test(processing), 'processing should not keep mode-specific presets or branches');
 assert.match(html, /type="file" accept="image\/png,image\/jpeg"/, 'upload should accept JPG and PNG');
 assert.match(app, /GoldProcessing\.processVeins/, 'app should use the v2 processing pipeline');
 assert.match(app, /downloadTransparentPng/, 'app should export transparent PNG');

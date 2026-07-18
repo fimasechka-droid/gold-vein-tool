@@ -37,8 +37,9 @@ const thinVein = imageData(7, 3, [
   px(245,245,245), px(220,170,45), px(220,170,45), px(221,171,46), px(220,170,45), px(220,170,45), px(245,245,245),
   px(245,245,245), px(245,245,245), px(245,245,245), px(220,170,45), px(245,245,245), px(245,245,245), px(245,245,245),
 ]);
-const veinResult = processVeins(thinVein, { mode: 'fine', sensitivity: 55, connectGaps: 35, noiseCleanup: 20 });
-assert.ok(veinResult.detectedPixels >= 7, 'thin connected veins should be preserved');
+const veinResult = processVeins(thinVein, { sensitivity: 55, connectGaps: 35, noiseCleanup: 20 });
+assert.equal(veinResult.detectedPixels, 7, 'the single default processing behavior should preserve the previously selected default result');
+assert.deepEqual([...veinResult.mask], [0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0], 'the default processing mask should match the previously selected default behavior');
 
 const noisy = imageData(6, 4, [
   px(245,245,245), px(218,166,52), px(245,245,245), px(245,245,245), px(245,245,245), px(245,245,245),
@@ -46,7 +47,7 @@ const noisy = imageData(6, 4, [
   px(245,245,245), px(245,245,245), px(245,245,245), px(218,166,52), px(218,166,52), px(218,166,52),
   px(245,245,245), px(245,245,245), px(245,245,245), px(218,166,52), px(218,166,52), px(218,166,52),
 ]);
-const clean = processVeins(noisy, { mode: 'balanced', sensitivity: 55, connectGaps: 0, noiseCleanup: 20 });
+const clean = processVeins(noisy, { sensitivity: 55, connectGaps: 0, noiseCleanup: 20 });
 assert.equal(clean.mask[1], 0, 'isolated warm noise should be removed');
 assert.ok(clean.detectedPixels >= 9, 'larger metallic fragments should remain');
 

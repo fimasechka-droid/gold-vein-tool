@@ -52,7 +52,7 @@ image
  → SVG smoothing
 ```
 
-Сейчас каждый пиксель либо gold, либо not gold. Это ломает тонкие прожилки, если в линии есть блики, тени, JPEG-артефакты или полупрозрачные участки.
+Сейчас каждый пиксель либо gold, либо not gold. Это ломает узкие прожилки, если в линии есть блики, тени, JPEG-артефакты или полупрозрачные участки.
 
 Лучше сначала строить не бинарную маску, а **карту вероятности золота**:
 
@@ -144,7 +144,7 @@ goldScore =
 * CLAHE / contrast normalization только для score map, не для исходника;
 * white balance / gray-world correction опционально.
 
-Важно: слишком сильное размытие уничтожит тонкие прожилки, поэтому blur должен быть небольшим и настраиваемым внутренне, а не обязательно через UI.
+Важно: слишком сильное размытие уничтожит узкие прожилки, поэтому blur должен быть небольшим и настраиваемым внутренне, а не обязательно через UI.
 
 ---
 
@@ -425,7 +425,7 @@ tolerance = min(baseTolerance, localWidth * 0.2)
 То есть:
 
 * толстые области можно сглаживать сильнее;
-* тонкие прожилки сглаживать минимально;
+* узкие прожилки сглаживать минимально;
 * endpoints и sharp turns сохранять.
 
 ## Методы
@@ -516,7 +516,7 @@ Noise cleanup: Low / Medium / High
 Очень полезно для тонких прожилок:
 
 ```text
-Preserve fine veins: Low / Medium / High
+Preserve delicate vein details: Low / Medium / High
 ```
 
 Это влияет на:
@@ -753,7 +753,7 @@ D3 contour module вычисляет contour polygons через marching square
 Но я бы начал с собственной маленькой реализации RDP, потому что:
 
 * нужно adaptive tolerance;
-* нужно сохранять thin veins;
+* нужно сохранять детали узких прожилок;
 * меньше зависимостей.
 
 ---
@@ -822,7 +822,7 @@ Closing/gap bridging может превратить отдельные золо
 
 ---
 
-## Риск 3. Сглаживание может уничтожить тонкие прожилки
+## Риск 3. Сглаживание может уничтожить узкие прожилки
 
 SVG simplification опасен для тонких линий.
 
@@ -831,7 +831,7 @@ SVG simplification опасен для тонких линий.
 * adaptive tolerance;
 * учитывать local width;
 * сохранять skeleton endpoints/junctions;
-* иметь режим “Preserve fine veins”.
+* сохранять детали узких прожилок.
 
 ---
 
@@ -985,7 +985,7 @@ OpenCV.js тяжёлый, Potrace/WASM может иметь вопросы ли
 
 1. Добавить contour simplification.
 2. Использовать adaptive tolerance.
-3. Защитить тонкие прожилки через:
+3. Защитить узкие прожилки через:
    * local width;
    * skeleton endpoints;
    * max fitting error.
@@ -1012,7 +1012,7 @@ OpenCV.js тяжёлый, Potrace/WASM может иметь вопросы ли
    * Gold sensitivity;
    * Line continuity;
    * Noise cleanup;
-   * Preserve fine veins.
+   * Preserve delicate vein details.
 2. Advanced controls:
    * Threshold;
    * Morphology radius;
