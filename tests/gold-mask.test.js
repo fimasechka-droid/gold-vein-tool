@@ -35,7 +35,36 @@ for (let i = 0; i < veinResult.mask.length; i += 1) {
 const svg = createSvg(veinResult);
 assert.match(svg, /^<svg /, 'SVG should be generated');
 assert.match(svg, /<path /, 'SVG should contain vector paths');
-assert.doesNotMatch(svg, /<image|data:image\/png|<rect/i, 'SVG must not contain raster image or background rectangle');
-assert.match(svg, /viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
+assert.doesNotMatch(svg, /<image|data:image\/png/i, 'SVG must not contain raster image data');
+assert.match(svg, /width="7" height="3" viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
+assert.match(svg, /<g id="registration-marks" stroke="black" stroke-width="1" fill="none" stroke-linecap="square">/, 'SVG should include selectable registration marks');
+assert.match(svg, /<path d="M 3 0/, 'SVG path coordinates should remain in the original canvas coordinate space');
+
+const sparseMask = {
+  width: 20,
+  height: 18,
+  originalWidth: 20,
+  originalHeight: 18,
+  mask: new Uint8Array(360),
+};
+sparseMask.mask[14 * sparseMask.width + 17] = 1;
+const sparseSvg = createSvg(sparseMask);
+assert.match(sparseSvg, /width="20" height="18" viewBox="0 0 20 18"/, 'SVG should use the full source canvas rather than the vein bounding box');
+[
+  ['2', '5', '8', '5'],
+  ['5', '2', '5', '8'],
+  ['12', '5', '18', '5'],
+  ['15', '2', '15', '8'],
+  ['2', '13', '8', '13'],
+  ['5', '10', '5', '16'],
+  ['12', '13', '18', '13'],
+  ['15', '10', '15', '16'],
+].forEach(function (coords) {
+  assert.match(
+    sparseSvg,
+    new RegExp(`<line x1="${coords[0]}" y1="${coords[1]}" x2="${coords[2]}" y2="${coords[3]}"\\/>`),
+    `registration mark line should exist at ${coords.join(',')}`,
+  );
+});
 
 console.log('Gold vein processing tests passed.');

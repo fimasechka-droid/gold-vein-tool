@@ -102,21 +102,51 @@
     return `${d} Z`;
   }
 
+  function svgCanvasDimensions(maskResult) {
+    return {
+      width: maskResult.originalWidth || maskResult.imageWidth || maskResult.width,
+      height: maskResult.originalHeight || maskResult.imageHeight || maskResult.height,
+    };
+  }
+
+  function registrationMarks(dimensions) {
+    const inset = 5;
+    const halfSize = 3;
+    const centers = [
+      [inset, inset],
+      [dimensions.width - inset, inset],
+      [inset, dimensions.height - inset],
+      [dimensions.width - inset, dimensions.height - inset],
+    ];
+    const lines = centers.flatMap(function (center) {
+      const x = center[0];
+      const y = center[1];
+      return [
+        `    <line x1="${x - halfSize}" y1="${y}" x2="${x + halfSize}" y2="${y}"/>`,
+        `    <line x1="${x}" y1="${y - halfSize}" x2="${x}" y2="${y + halfSize}"/>`,
+      ];
+    }).join('\n');
+    return `  <g id="registration-marks" stroke="black" stroke-width="1" fill="none" stroke-linecap="square">\n${lines}\n  </g>`;
+  }
+
   function createSvg(maskResult) {
+    const dimensions = svgCanvasDimensions(maskResult);
     const paths = traceMask(maskResult.mask, maskResult.width, maskResult.height)
       .map(function (path) { return simplifyPath(path, VECTOR_SIMPLIFICATION_TOLERANCE); })
       .filter(function (path) { return path.length > 3; })
       .map(pathToSvg)
       .filter(Boolean);
-    const body = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${maskResult.width}" height="${maskResult.height}" viewBox="0 0 ${maskResult.width} ${maskResult.height}">\n${body}\n</svg>\n`;
+    const marks = registrationMarks(dimensions);
+    const pathBody = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
+    const body = pathBody ? `${marks}\n${pathBody}` : marks;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}" viewBox="0 0 ${dimensions.width} ${dimensions.height}">\n${body}\n</svg>\n`;
   }
 
   function downloadSvg(maskResult, fileName) {
     downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
-  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, createSvg, downloadSvg };
+  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
   global.GoldExporters = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
