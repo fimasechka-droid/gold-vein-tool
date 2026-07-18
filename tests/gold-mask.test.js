@@ -68,6 +68,28 @@ assert.deepEqual(diagonalFittedContour.slice(0, -1).map(function (point) { retur
 assert.ok((diagonalSvg.match(/ C /g) || []).length < 8, 'diagonal contour should be fitted to fewer curves than the source pixel stair steps');
 
 
+const longStairMask = {
+  width: 12,
+  height: 8,
+  mask: new Uint8Array([
+    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ]),
+};
+const longStairRawContour = traceMask(longStairMask.mask, longStairMask.width, longStairMask.height)[0];
+const longStairFittedContour = fitContour(longStairRawContour, 1.15);
+const longStairSvg = createSvg(longStairMask);
+assert.ok(longStairFittedContour.length <= 6, 'long stair-stepped edges should collapse to the main contour turns');
+assert.ok(longStairRawContour.length > longStairFittedContour.length * 5, 'long stair-stepped edges should drop unnecessary pixel-step vertices');
+assert.match(longStairSvg, /C 2\.319 0\.279 7\.881 6\.792 8 7/, 'long diagonal stair-step should use relaxed Bézier handles for a gentler contour');
+
+
 const branchMask = {
   width: 5,
   height: 5,
@@ -79,10 +101,27 @@ const branchMask = {
     0, 0, 1, 0, 0,
   ]),
 };
-const branchContour = fitContour(traceMask(branchMask.mask, branchMask.width, branchMask.height)[0], 0.9);
+const branchContour = fitContour(traceMask(branchMask.mask, branchMask.width, branchMask.height)[0], 1.15);
 const branchPoints = new Set(branchContour.map(function (point) { return point.join(','); }));
 assert.ok(branchPoints.has('2,0') || branchPoints.has('3,0'), 'thin vertical branch tip should remain after contour fitting');
 assert.ok(branchPoints.has('0,2') || branchPoints.has('0,3'), 'thin horizontal branch tip should remain after contour fitting');
+
+
+const peakValleyMask = {
+  width: 7,
+  height: 5,
+  mask: new Uint8Array([
+    0, 0, 0, 1, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0,
+    0, 1, 1, 1, 1, 1, 0,
+    1, 1, 1, 1, 1, 1, 1,
+    0, 0, 0, 0, 0, 0, 0,
+  ]),
+};
+const peakValleyContour = fitContour(traceMask(peakValleyMask.mask, peakValleyMask.width, peakValleyMask.height)[0], 1.15);
+const peakValleyPoints = new Set(peakValleyContour.map(function (point) { return point.join(','); }));
+assert.ok(peakValleyPoints.has('3,0'), 'meaningful pointed peak should remain after contour fitting');
+assert.ok(peakValleyPoints.has('0,4') || peakValleyPoints.has('7,3'), 'meaningful valley/base direction change should remain after contour fitting');
 
 const donutMask = {
   width: 5,
