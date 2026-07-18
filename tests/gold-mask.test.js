@@ -7,6 +7,28 @@ function imageData(width, height, pixels) {
 }
 function px(r, g, b, a = 255) { return [r, g, b, a]; }
 
+function pointSegmentDistance(point, start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  if (!dx && !dy) return Math.hypot(point[0] - start[0], point[1] - start[1]);
+  const t = Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(point[0] - (start[0] + t * dx), point[1] - (start[1] + t * dy));
+}
+
+function distanceToContour(point, contour) {
+  let best = Infinity;
+  for (let i = 0; i < contour.length - 1; i += 1) {
+    best = Math.min(best, pointSegmentDistance(point, contour[i], contour[i + 1]));
+  }
+  return best;
+}
+
+function assertNearSourceBoundary(fitted, raw, maxDistance) {
+  fitted.slice(0, -1).forEach(function (point) {
+    assert.ok(distanceToContour(point, raw) <= maxDistance, `fitted point ${point.join(',')} should stay within ${maxDistance}px of the source boundary`);
+  });
+}
+
 assert.ok(goldProbabilityForPixel(218, 166, 52) > goldProbabilityForPixel(230, 230, 230), 'gold should score above white');
 assert.ok(goldProbabilityForPixel(218, 166, 52) > goldProbabilityForPixel(35, 40, 80), 'gold should score above blue/dark color');
 
@@ -66,6 +88,7 @@ assert.ok(diagonalFittedContour.length <= 6, 'staircase contour should be reduce
 assert.ok(diagonalRawContour.length > diagonalFittedContour.length * 4, 'fitted contour should ignore intermediate pixel-step vertices');
 assert.deepEqual(diagonalFittedContour.slice(0, -1).map(function (point) { return point.join(','); }), ['0,0', '2,0', '6,5', '4,5'], 'fitted contour should retain the main peaks and valleys of the diagonal shape');
 assert.ok((diagonalSvg.match(/ C /g) || []).length < 8, 'diagonal contour should be fitted to fewer curves than the source pixel stair steps');
+assertNearSourceBoundary(diagonalFittedContour, diagonalRawContour, 1.15);
 
 
 const longStairMask = {
@@ -87,7 +110,25 @@ const longStairFittedContour = fitContour(longStairRawContour, 1.15);
 const longStairSvg = createSvg(longStairMask);
 assert.ok(longStairFittedContour.length <= 6, 'long stair-stepped edges should collapse to the main contour turns');
 assert.ok(longStairRawContour.length > longStairFittedContour.length * 5, 'long stair-stepped edges should drop unnecessary pixel-step vertices');
+assertNearSourceBoundary(longStairFittedContour, longStairRawContour, 1.15);
 assert.match(longStairSvg, /C 2\.319 0\.279 7\.881 6\.792 8 7/, 'long diagonal stair-step should use relaxed Bézier handles for a gentler contour');
+
+
+const zigzagMask = {
+  width: 9,
+  height: 5,
+  mask: new Uint8Array([
+    1, 1, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 1, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ]),
+};
+const zigzagRawContour = traceMask(zigzagMask.mask, zigzagMask.width, zigzagMask.height)[0];
+const zigzagFittedContour = fitContour(zigzagRawContour, 1.15);
+assert.ok(zigzagFittedContour.length <= 6, 'short alternating pixel zigzags should be removed from a diagonal run');
+assertNearSourceBoundary(zigzagFittedContour, zigzagRawContour, 1.15);
 
 
 const branchMask = {
@@ -105,6 +146,7 @@ const branchContour = fitContour(traceMask(branchMask.mask, branchMask.width, br
 const branchPoints = new Set(branchContour.map(function (point) { return point.join(','); }));
 assert.ok(branchPoints.has('2,0') || branchPoints.has('3,0'), 'thin vertical branch tip should remain after contour fitting');
 assert.ok(branchPoints.has('0,2') || branchPoints.has('0,3'), 'thin horizontal branch tip should remain after contour fitting');
+assert.equal(branchContour[0].join(','), branchContour[branchContour.length - 1].join(','), 'thin branch contour should remain closed');
 
 
 const peakValleyMask = {
@@ -137,6 +179,9 @@ const donutMask = {
 const donutSvg = createSvg(donutMask);
 assert.match(donutSvg, /fill-rule="evenodd"/, 'compound SVG path should preserve holes as holes');
 assert.ok((donutSvg.match(/M /g) || []).length >= 2, 'hole contour should be retained as its own subpath');
+traceMask(donutMask.mask, donutMask.width, donutMask.height).map(function (contour) { return fitContour(contour, 1.15); }).forEach(function (contour) {
+  assert.equal(contour[0].join(','), contour[contour.length - 1].join(','), 'outer and hole contours should remain closed after fitting');
+});
 
 const disconnectedMask = {
   width: 6,

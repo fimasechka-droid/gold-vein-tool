@@ -3,6 +3,8 @@
   const CURVE_HANDLE_SCALE = 0.36;
   const SHARP_CORNER_HANDLE_SCALE = 0.12;
   const SHARP_CORNER_ANGLE_DEGREES = 100;
+  const STAIR_STEP_CHORD_DISTANCE = Math.SQRT2;
+  const STAIR_STEP_EXTREMA_RADIUS = 2;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -116,9 +118,53 @@
     return [first, second];
   }
 
-  function fitContour(points, tolerance) {
+
+  function isLocalExtremum(points, index, radius) {
+    const point = points[index];
+    let minX = point[0];
+    let maxX = point[0];
+    let minY = point[1];
+    let maxY = point[1];
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const neighbor = points[(index + offset + points.length) % points.length];
+      minX = Math.min(minX, neighbor[0]);
+      maxX = Math.max(maxX, neighbor[0]);
+      minY = Math.min(minY, neighbor[1]);
+      maxY = Math.max(maxY, neighbor[1]);
+    }
+    return point[0] === minX || point[0] === maxX || point[1] === minY || point[1] === maxY;
+  }
+
+  function isShortAlternatingStep(previous, current, next) {
+    const prevDx = current[0] - previous[0];
+    const prevDy = current[1] - previous[1];
+    const nextDx = next[0] - current[0];
+    const nextDy = next[1] - current[1];
+    const previousIsUnitAxis = Math.abs(prevDx) + Math.abs(prevDy) === 1;
+    const nextIsUnitAxis = Math.abs(nextDx) + Math.abs(nextDy) === 1;
+    const changesAxis = (prevDx === 0 && nextDy === 0) || (prevDy === 0 && nextDx === 0);
+    const advancesDiagonally = Math.abs(next[0] - previous[0]) === 1 && Math.abs(next[1] - previous[1]) === 1;
+    return previousIsUnitAxis && nextIsUnitAxis && changesAxis && advancesDiagonally && Math.hypot(next[0] - previous[0], next[1] - previous[1]) <= STAIR_STEP_CHORD_DISTANCE;
+  }
+
+  function removePixelStepJitter(points) {
+    if (points.length <= 6) return points.slice();
     const source = removeDuplicateClosingPoint(points);
-    if (source.length <= 6) return points;
+    const filtered = [];
+    for (let i = 0; i < source.length; i += 1) {
+      const previous = source[(i - 1 + source.length) % source.length];
+      const current = source[i];
+      const next = source[(i + 1) % source.length];
+      const removableStairStep = isShortAlternatingStep(previous, current, next) && !isLocalExtremum(source, i, STAIR_STEP_EXTREMA_RADIUS);
+      if (!removableStairStep) filtered.push(current);
+    }
+    if (filtered.length >= 3) filtered.push(filtered[0]);
+    return filtered.length >= 4 ? filtered : points.slice();
+  }
+
+  function fitContour(points, tolerance) {
+    const source = removeDuplicateClosingPoint(removePixelStepJitter(points));
+    if (source.length <= 6) return source.concat([source[0]]);
 
     // Closed contours cannot be simplified well by cutting at an arbitrary
     // point: that tends to keep the staircase near the seam. Split the outline
