@@ -1,6 +1,6 @@
 (function (global) {
-  const VECTOR_SIMPLIFICATION_TOLERANCE = 0;
-  const CONTOUR_SMOOTHING_FACTOR = 0.18;
+  const CONTOUR_FIT_TOLERANCE = 0.72;
+  const CURVE_TENSION = 0.45;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -39,10 +39,9 @@
       for (let x = 0; x < width; x += 1) {
         if (!has(x, y)) continue;
 
-        // Emit contour edges on the subpixel boundary between the foreground
-        // pixel center and neighbouring background pixel centers. This keeps
-        // coordinates in the original export space but avoids tracing the mask
-        // as filled square cells.
+        // Collect only foreground/background transitions. These raw transitions
+        // are an input bitmap outline; a later fitting pass reconstructs a much
+        // smaller smooth contour instead of exporting each pixel step.
         const left = x;
         const right = x + 1;
         const top = y;
@@ -75,27 +74,33 @@
     return paths;
   }
 
-  function smoothContour(points, factor) {
-    if (points.length <= 4 || factor <= 0) return points;
-    const closed = points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
-    const source = closed ? points.slice(0, -1) : points.slice();
-    const smoothed = [];
-    for (let i = 0; i < source.length; i += 1) {
-      const previous = source[(i - 1 + source.length) % source.length];
-      const current = source[i];
-      const next = source[(i + 1) % source.length];
-      const incoming = [
-        current[0] + (previous[0] - current[0]) * factor,
-        current[1] + (previous[1] - current[1]) * factor,
-      ];
-      const outgoing = [
-        current[0] + (next[0] - current[0]) * factor,
-        current[1] + (next[1] - current[1]) * factor,
-      ];
-      smoothed.push(incoming, outgoing);
+  function removeDuplicateClosingPoint(points) {
+    return points.length > 1 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1]
+      ? points.slice(0, -1)
+      : points.slice();
+  }
+
+  function rotateToIndex(points, startIndex) {
+    return points.slice(startIndex).concat(points.slice(0, startIndex));
+  }
+
+  function fitContour(points, tolerance) {
+    const source = removeDuplicateClosingPoint(points);
+    if (source.length <= 6) return points;
+
+    // Potrace-style polygon fitting: find a stable break point, unwrap the
+    // closed contour there, then Douglas-Peucker-fit the bitmap outline into a
+    // concise polygon before curve fitting. The tolerance is intentionally below
+    // one pixel so thin branches and small vein details are retained.
+    let startIndex = 0;
+    for (let i = 1; i < source.length; i += 1) {
+      if (source[i][0] < source[startIndex][0] || (source[i][0] === source[startIndex][0] && source[i][1] < source[startIndex][1])) startIndex = i;
     }
-    if (closed) smoothed.push(smoothed[0]);
-    return smoothed;
+    const rotated = rotateToIndex(source, startIndex);
+    rotated.push(rotated[0]);
+    const fitted = simplifyPath(rotated, tolerance);
+    if (fitted.length > 2 && (fitted[0][0] !== fitted[fitted.length - 1][0] || fitted[0][1] !== fitted[fitted.length - 1][1])) fitted.push(fitted[0]);
+    return fitted.length >= 4 ? fitted : points;
   }
 
   function perpendicularDistance(point, start, end) {
@@ -134,16 +139,23 @@
   }
 
   function pathToSvg(points) {
-    if (points.length < 3) return '';
-    let d = `M ${formatNumber(points[0][0])} ${formatNumber(points[0][1])}`;
-    for (let i = 1; i < points.length - 1; i += 2) {
-      const control = points[i];
-      const end = points[i + 1];
-      d += ` Q ${formatNumber(control[0])} ${formatNumber(control[1])} ${formatNumber(end[0])} ${formatNumber(end[1])}`;
-    }
-    if (points.length % 2 === 0) {
-      const last = points[points.length - 1];
-      d += ` L ${formatNumber(last[0])} ${formatNumber(last[1])}`;
+    const source = removeDuplicateClosingPoint(points);
+    if (source.length < 3) return '';
+    let d = `M ${formatNumber(source[0][0])} ${formatNumber(source[0][1])}`;
+    for (let i = 0; i < source.length; i += 1) {
+      const previous = source[(i - 1 + source.length) % source.length];
+      const current = source[i];
+      const next = source[(i + 1) % source.length];
+      const afterNext = source[(i + 2) % source.length];
+      const cp1 = [
+        current[0] + (next[0] - previous[0]) * (CURVE_TENSION / 6),
+        current[1] + (next[1] - previous[1]) * (CURVE_TENSION / 6),
+      ];
+      const cp2 = [
+        next[0] - (afterNext[0] - current[0]) * (CURVE_TENSION / 6),
+        next[1] - (afterNext[1] - current[1]) * (CURVE_TENSION / 6),
+      ];
+      d += ` C ${formatNumber(cp1[0])} ${formatNumber(cp1[1])} ${formatNumber(cp2[0])} ${formatNumber(cp2[1])} ${formatNumber(next[0])} ${formatNumber(next[1])}`;
     }
     return `${d} Z`;
   }
@@ -178,7 +190,7 @@
   function createSvg(maskResult) {
     const dimensions = svgCanvasDimensions(maskResult);
     const paths = traceMask(maskResult.mask, maskResult.width, maskResult.height)
-      .map(function (path) { return simplifyPath(path, VECTOR_SIMPLIFICATION_TOLERANCE); })
+      .map(function (path) { return fitContour(path, CONTOUR_FIT_TOLERANCE); })
       .filter(function (path) { return path.length > 3; })
       .map(pathToSvg)
       .filter(Boolean);
@@ -192,7 +204,7 @@
     downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
-  const api = { transparentPngUrl, downloadTransparentPng, traceMask, smoothContour, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
+  const api = { transparentPngUrl, downloadTransparentPng, traceMask, fitContour, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
   global.GoldExporters = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

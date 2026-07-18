@@ -39,7 +39,7 @@ assert.doesNotMatch(svg, /<image|data:image\/png/i, 'SVG must not contain raster
 assert.match(svg, /width="7" height="3" viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
 assert.match(svg, /<g id="registration-marks" stroke="black" stroke-width="1" fill="none" stroke-linecap="square">/, 'SVG should include selectable registration marks');
 assert.match(svg, /<path d="M /, 'SVG path coordinates should remain in the original canvas coordinate space');
-assert.match(svg, / Q /, 'SVG should use smooth quadratic path segments');
+assert.match(svg, / C /, 'SVG should use smooth cubic Bézier path segments');
 
 
 const diagonalMask = {
@@ -55,8 +55,9 @@ const diagonalMask = {
   ]),
 };
 const diagonalSvg = createSvg(diagonalMask);
-assert.match(diagonalSvg, / Q /, 'diagonal shapes should export with smoothed curve segments instead of only axis-aligned lines');
-assert.doesNotMatch(diagonalSvg, /(?: L \d+(?:\.\d+)? \d+(?:\.\d+)?){8,}/, 'diagonal shape should not export as a purely line-based staircase');
+assert.match(diagonalSvg, / C /, 'diagonal shapes should export with smoothed cubic curve segments instead of only axis-aligned lines');
+assert.doesNotMatch(diagonalSvg, /(?: [LQ] \d+(?:\.\d+)? \d+(?:\.\d+)?){8,}/, 'diagonal shape should not export as a purely line-based staircase');
+assert.ok((diagonalSvg.match(/ C /g) || []).length < 12, 'diagonal contour should be fitted to fewer curves than the source pixel stair steps');
 
 const donutMask = {
   width: 5,
