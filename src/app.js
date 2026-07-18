@@ -1,11 +1,10 @@
 (function () {
-  const defaults = { mode: 'balanced', sensitivity: 58, connectGaps: 45, noiseCleanup: 45, vectorSmoothing: 35 };
+  const defaults = { mode: 'balanced', sensitivity: 58, connectGaps: 45, noiseCleanup: 45 };
   const upload = document.querySelector('#image-upload');
   const mode = document.querySelector('#processing-mode');
   const sensitivity = document.querySelector('#sensitivity');
   const connectGaps = document.querySelector('#connect-gaps');
   const noiseCleanup = document.querySelector('#noise-cleanup');
-  const vectorSmoothing = document.querySelector('#vector-smoothing');
   const status = document.querySelector('#status');
   const reset = document.querySelector('#reset');
   const downloadPng = document.querySelector('#download-png');
@@ -26,14 +25,12 @@
       sensitivity: Number(sensitivity.value),
       connectGaps: Number(connectGaps.value),
       noiseCleanup: Number(noiseCleanup.value),
-      vectorSmoothing: Number(vectorSmoothing.value),
     };
   }
   function updateLabels() {
     setOutput('#sensitivity-value', sensitivity.value);
     setOutput('#connect-gaps-value', connectGaps.value);
     setOutput('#noise-cleanup-value', noiseCleanup.value);
-    setOutput('#vector-smoothing-value', vectorSmoothing.value);
   }
   function imageDataFromImage(image) {
     const canvas = document.createElement('canvas');
@@ -94,13 +91,12 @@
     sensitivity.value = defaults.sensitivity;
     connectGaps.value = defaults.connectGaps;
     noiseCleanup.value = defaults.noiseCleanup;
-    vectorSmoothing.value = defaults.vectorSmoothing;
     updateLabels();
     processImage();
   }
 
   upload.addEventListener('change', function (event) { loadFile(event.target.files[0]); });
-  [mode, sensitivity, connectGaps, noiseCleanup, vectorSmoothing].forEach(function (control) {
+  [mode, sensitivity, connectGaps, noiseCleanup].forEach(function (control) {
     control.addEventListener('input', function () { updateLabels(); processImage(); });
   });
   reset.addEventListener('click', resetSettings);
@@ -115,7 +111,7 @@
     if (currentResult) window.GoldExporters.downloadTransparentPng(currentResult, `${currentFileName}-prozhilki.png`);
   });
   downloadSvg.addEventListener('click', function () {
-    if (currentResult) window.GoldExporters.downloadSvg(currentResult, `${currentFileName}-prozhilki.svg`, options());
+    if (currentResult) window.GoldExporters.downloadSvg(currentResult, `${currentFileName}-prozhilki.svg`);
   });
 
   updateLabels();

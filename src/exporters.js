@@ -1,4 +1,5 @@
 (function (global) {
+  const VECTOR_SIMPLIFICATION_TOLERANCE = 0.63;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -101,10 +102,9 @@
     return `${d} Z`;
   }
 
-  function createSvg(maskResult, options) {
-    const smoothing = Math.min(1.8, Math.max(0, (options?.vectorSmoothing ?? 35) / 100 * 1.8));
+  function createSvg(maskResult) {
     const paths = traceMask(maskResult.mask, maskResult.width, maskResult.height)
-      .map(function (path) { return simplifyPath(path, smoothing); })
+      .map(function (path) { return simplifyPath(path, VECTOR_SIMPLIFICATION_TOLERANCE); })
       .filter(function (path) { return path.length > 3; })
       .map(pathToSvg)
       .filter(Boolean);
@@ -112,8 +112,8 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${maskResult.width}" height="${maskResult.height}" viewBox="0 0 ${maskResult.width} ${maskResult.height}">\n${body}\n</svg>\n`;
   }
 
-  function downloadSvg(maskResult, fileName, options) {
-    downloadBlob(createSvg(maskResult, options), fileName, 'image/svg+xml;charset=utf-8');
+  function downloadSvg(maskResult, fileName) {
+    downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
   const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, createSvg, downloadSvg };
