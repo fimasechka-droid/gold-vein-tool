@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { processVeins, goldProbabilityForPixel } = require('../src/processing');
-const { createSvg, traceMask } = require('../src/exporters');
+const { createSvg, traceMask, fitContour } = require('../src/exporters');
 
 function imageData(width, height, pixels) {
   return { width, height, data: new Uint8ClampedArray(pixels.flat()) };
@@ -54,10 +54,32 @@ const diagonalMask = {
     0, 0, 0, 0, 0, 0,
   ]),
 };
+const diagonalRawContour = traceMask(diagonalMask.mask, diagonalMask.width, diagonalMask.height)[0];
+const diagonalFittedContour = fitContour(diagonalRawContour, 0.9);
 const diagonalSvg = createSvg(diagonalMask);
 assert.match(diagonalSvg, / C /, 'diagonal shapes should export with smoothed cubic curve segments instead of only axis-aligned lines');
 assert.doesNotMatch(diagonalSvg, /(?: [LQ] \d+(?:\.\d+)? \d+(?:\.\d+)?){8,}/, 'diagonal shape should not export as a purely line-based staircase');
-assert.ok((diagonalSvg.match(/ C /g) || []).length < 12, 'diagonal contour should be fitted to fewer curves than the source pixel stair steps');
+assert.ok(diagonalFittedContour.length <= 6, 'staircase contour should be reduced to a small set of significant vertices');
+assert.ok(diagonalRawContour.length > diagonalFittedContour.length * 4, 'fitted contour should ignore intermediate pixel-step vertices');
+assert.deepEqual(diagonalFittedContour.slice(0, -1).map(function (point) { return point.join(','); }), ['0,0', '2,0', '6,5', '4,5'], 'fitted contour should retain the main peaks and valleys of the diagonal shape');
+assert.ok((diagonalSvg.match(/ C /g) || []).length < 8, 'diagonal contour should be fitted to fewer curves than the source pixel stair steps');
+
+
+const branchMask = {
+  width: 5,
+  height: 5,
+  mask: new Uint8Array([
+    0, 0, 1, 0, 0,
+    0, 0, 1, 0, 0,
+    1, 1, 1, 1, 1,
+    0, 0, 1, 0, 0,
+    0, 0, 1, 0, 0,
+  ]),
+};
+const branchContour = fitContour(traceMask(branchMask.mask, branchMask.width, branchMask.height)[0], 0.9);
+const branchPoints = new Set(branchContour.map(function (point) { return point.join(','); }));
+assert.ok(branchPoints.has('2,0') || branchPoints.has('3,0'), 'thin vertical branch tip should remain after contour fitting');
+assert.ok(branchPoints.has('0,2') || branchPoints.has('0,3'), 'thin horizontal branch tip should remain after contour fitting');
 
 const donutMask = {
   width: 5,

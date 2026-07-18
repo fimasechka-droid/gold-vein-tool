@@ -1,6 +1,6 @@
 (function (global) {
-  const CONTOUR_FIT_TOLERANCE = 0.72;
-  const CURVE_TENSION = 0.45;
+  const CONTOUR_FIT_TOLERANCE = 0.9;
+  const CURVE_HANDLE_SCALE = 0.22;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -80,26 +80,54 @@
       : points.slice();
   }
 
-  function rotateToIndex(points, startIndex) {
-    return points.slice(startIndex).concat(points.slice(0, startIndex));
+  function squaredDistance(a, b) {
+    const dx = a[0] - b[0];
+    const dy = a[1] - b[1];
+    return dx * dx + dy * dy;
+  }
+
+  function contourChain(points, startIndex, endIndex) {
+    const chain = [];
+    let index = startIndex;
+    while (index !== endIndex) {
+      chain.push(points[index]);
+      index = (index + 1) % points.length;
+    }
+    chain.push(points[endIndex]);
+    return chain;
+  }
+
+  function farthestContourPair(points) {
+    let first = 0;
+    let second = Math.floor(points.length / 2);
+    let bestDistance = -1;
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const distance = squaredDistance(points[i], points[j]);
+        if (distance > bestDistance) {
+          bestDistance = distance;
+          first = i;
+          second = j;
+        }
+      }
+    }
+    return [first, second];
   }
 
   function fitContour(points, tolerance) {
     const source = removeDuplicateClosingPoint(points);
     if (source.length <= 6) return points;
 
-    // Potrace-style polygon fitting: find a stable break point, unwrap the
-    // closed contour there, then Douglas-Peucker-fit the bitmap outline into a
-    // concise polygon before curve fitting. The tolerance is intentionally below
-    // one pixel so thin branches and small vein details are retained.
-    let startIndex = 0;
-    for (let i = 1; i < source.length; i += 1) {
-      if (source[i][0] < source[startIndex][0] || (source[i][0] === source[startIndex][0] && source[i][1] < source[startIndex][1])) startIndex = i;
-    }
-    const rotated = rotateToIndex(source, startIndex);
-    rotated.push(rotated[0]);
-    const fitted = simplifyPath(rotated, tolerance);
-    if (fitted.length > 2 && (fitted[0][0] !== fitted[fitted.length - 1][0] || fitted[0][1] !== fitted[fitted.length - 1][1])) fitted.push(fitted[0]);
+    // Closed contours cannot be simplified well by cutting at an arbitrary
+    // point: that tends to keep the staircase near the seam. Split the outline
+    // at the farthest pair of contour vertices, simplify both arcs, then join
+    // them again. This keeps real peaks/valleys and narrow protrusions while
+    // removing the intermediate one-pixel steps along a continuous slope.
+    const pair = farthestContourPair(source);
+    const firstArc = simplifyPath(contourChain(source, pair[0], pair[1]), tolerance);
+    const secondArc = simplifyPath(contourChain(source, pair[1], pair[0]), tolerance);
+    const fitted = firstArc.slice(0, -1).concat(secondArc.slice(0, -1));
+    fitted.push(fitted[0]);
     return fitted.length >= 4 ? fitted : points;
   }
 
@@ -134,6 +162,19 @@
     return simplified;
   }
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampToPoints(point, points) {
+    const xs = points.map(function (candidate) { return candidate[0]; });
+    const ys = points.map(function (candidate) { return candidate[1]; });
+    return [
+      clamp(point[0], Math.min.apply(null, xs), Math.max.apply(null, xs)),
+      clamp(point[1], Math.min.apply(null, ys), Math.max.apply(null, ys)),
+    ];
+  }
+
   function formatNumber(value) {
     return Number(value.toFixed(3)).toString();
   }
@@ -147,14 +188,21 @@
       const current = source[i];
       const next = source[(i + 1) % source.length];
       const afterNext = source[(i + 2) % source.length];
-      const cp1 = [
-        current[0] + (next[0] - previous[0]) * (CURVE_TENSION / 6),
-        current[1] + (next[1] - previous[1]) * (CURVE_TENSION / 6),
-      ];
-      const cp2 = [
-        next[0] - (afterNext[0] - current[0]) * (CURVE_TENSION / 6),
-        next[1] - (afterNext[1] - current[1]) * (CURVE_TENSION / 6),
-      ];
+      const segmentLength = Math.hypot(next[0] - current[0], next[1] - current[1]);
+      const incomingLength = Math.hypot(current[0] - previous[0], current[1] - previous[1]);
+      const outgoingLength = Math.hypot(afterNext[0] - next[0], afterNext[1] - next[1]);
+      const handle1 = Math.min(segmentLength * CURVE_HANDLE_SCALE, incomingLength * CURVE_HANDLE_SCALE, segmentLength / 3);
+      const handle2 = Math.min(segmentLength * CURVE_HANDLE_SCALE, outgoingLength * CURVE_HANDLE_SCALE, segmentLength / 3);
+      const tangent1Length = Math.hypot(next[0] - previous[0], next[1] - previous[1]) || 1;
+      const tangent2Length = Math.hypot(afterNext[0] - current[0], afterNext[1] - current[1]) || 1;
+      const cp1 = clampToPoints([
+        current[0] + ((next[0] - previous[0]) / tangent1Length) * handle1,
+        current[1] + ((next[1] - previous[1]) / tangent1Length) * handle1,
+      ], [previous, current, next]);
+      const cp2 = clampToPoints([
+        next[0] - ((afterNext[0] - current[0]) / tangent2Length) * handle2,
+        next[1] - ((afterNext[1] - current[1]) / tangent2Length) * handle2,
+      ], [current, next, afterNext]);
       d += ` C ${formatNumber(cp1[0])} ${formatNumber(cp1[1])} ${formatNumber(cp2[0])} ${formatNumber(cp2[1])} ${formatNumber(next[0])} ${formatNumber(next[1])}`;
     }
     return `${d} Z`;
