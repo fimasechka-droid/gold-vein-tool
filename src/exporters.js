@@ -69,7 +69,7 @@
         key = pointKey(next);
         if (key === startKey) break;
       }
-      if (points.length > 3) paths.push(smoothContour(points, CONTOUR_SMOOTHING_FACTOR));
+      if (points.length > 3) paths.push(points);
     }
     return paths;
   }
