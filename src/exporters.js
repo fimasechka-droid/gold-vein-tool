@@ -1,5 +1,6 @@
 (function (global) {
-  const VECTOR_SIMPLIFICATION_TOLERANCE = 0.63;
+  const CONTOUR_FIT_TOLERANCE = 0.72;
+  const CURVE_TENSION = 0.45;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -26,20 +27,29 @@
 
   function traceMask(mask, width, height) {
     const edges = new Map();
-    function addEdge(x1, y1, x2, y2) {
-      const key = `${x1},${y1}`;
+    function pointKey(point) { return `${point[0]},${point[1]}`; }
+    function addEdge(from, to) {
+      const key = pointKey(from);
       if (!edges.has(key)) edges.set(key, []);
-      edges.get(key).push([x2, y2]);
+      edges.get(key).push(to);
     }
     function has(x, y) { return x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x]; }
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         if (!has(x, y)) continue;
-        if (!has(x, y - 1)) addEdge(x, y, x + 1, y);
-        if (!has(x + 1, y)) addEdge(x + 1, y, x + 1, y + 1);
-        if (!has(x, y + 1)) addEdge(x + 1, y + 1, x, y + 1);
-        if (!has(x - 1, y)) addEdge(x, y + 1, x, y);
+
+        // Collect only foreground/background transitions. These raw transitions
+        // are an input bitmap outline; a later fitting pass reconstructs a much
+        // smaller smooth contour instead of exporting each pixel step.
+        const left = x;
+        const right = x + 1;
+        const top = y;
+        const bottom = y + 1;
+        if (!has(x, y - 1)) addEdge([left, top], [right, top]);
+        if (!has(x + 1, y)) addEdge([right, top], [right, bottom]);
+        if (!has(x, y + 1)) addEdge([right, bottom], [left, bottom]);
+        if (!has(x - 1, y)) addEdge([left, bottom], [left, top]);
       }
     }
 
@@ -56,12 +66,41 @@
         const next = list.shift();
         if (!list.length) edges.delete(key);
         points.push(next);
-        key = `${next[0]},${next[1]}`;
+        key = pointKey(next);
         if (key === startKey) break;
       }
       if (points.length > 3) paths.push(points);
     }
     return paths;
+  }
+
+  function removeDuplicateClosingPoint(points) {
+    return points.length > 1 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1]
+      ? points.slice(0, -1)
+      : points.slice();
+  }
+
+  function rotateToIndex(points, startIndex) {
+    return points.slice(startIndex).concat(points.slice(0, startIndex));
+  }
+
+  function fitContour(points, tolerance) {
+    const source = removeDuplicateClosingPoint(points);
+    if (source.length <= 6) return points;
+
+    // Potrace-style polygon fitting: find a stable break point, unwrap the
+    // closed contour there, then Douglas-Peucker-fit the bitmap outline into a
+    // concise polygon before curve fitting. The tolerance is intentionally below
+    // one pixel so thin branches and small vein details are retained.
+    let startIndex = 0;
+    for (let i = 1; i < source.length; i += 1) {
+      if (source[i][0] < source[startIndex][0] || (source[i][0] === source[startIndex][0] && source[i][1] < source[startIndex][1])) startIndex = i;
+    }
+    const rotated = rotateToIndex(source, startIndex);
+    rotated.push(rotated[0]);
+    const fitted = simplifyPath(rotated, tolerance);
+    if (fitted.length > 2 && (fitted[0][0] !== fitted[fitted.length - 1][0] || fitted[0][1] !== fitted[fitted.length - 1][1])) fitted.push(fitted[0]);
+    return fitted.length >= 4 ? fitted : points;
   }
 
   function perpendicularDistance(point, start, end) {
@@ -95,10 +134,29 @@
     return simplified;
   }
 
+  function formatNumber(value) {
+    return Number(value.toFixed(3)).toString();
+  }
+
   function pathToSvg(points) {
-    if (points.length < 3) return '';
-    let d = `M ${points[0][0]} ${points[0][1]}`;
-    for (let i = 1; i < points.length; i += 1) d += ` L ${points[i][0]} ${points[i][1]}`;
+    const source = removeDuplicateClosingPoint(points);
+    if (source.length < 3) return '';
+    let d = `M ${formatNumber(source[0][0])} ${formatNumber(source[0][1])}`;
+    for (let i = 0; i < source.length; i += 1) {
+      const previous = source[(i - 1 + source.length) % source.length];
+      const current = source[i];
+      const next = source[(i + 1) % source.length];
+      const afterNext = source[(i + 2) % source.length];
+      const cp1 = [
+        current[0] + (next[0] - previous[0]) * (CURVE_TENSION / 6),
+        current[1] + (next[1] - previous[1]) * (CURVE_TENSION / 6),
+      ];
+      const cp2 = [
+        next[0] - (afterNext[0] - current[0]) * (CURVE_TENSION / 6),
+        next[1] - (afterNext[1] - current[1]) * (CURVE_TENSION / 6),
+      ];
+      d += ` C ${formatNumber(cp1[0])} ${formatNumber(cp1[1])} ${formatNumber(cp2[0])} ${formatNumber(cp2[1])} ${formatNumber(next[0])} ${formatNumber(next[1])}`;
+    }
     return `${d} Z`;
   }
 
@@ -132,12 +190,12 @@
   function createSvg(maskResult) {
     const dimensions = svgCanvasDimensions(maskResult);
     const paths = traceMask(maskResult.mask, maskResult.width, maskResult.height)
-      .map(function (path) { return simplifyPath(path, VECTOR_SIMPLIFICATION_TOLERANCE); })
+      .map(function (path) { return fitContour(path, CONTOUR_FIT_TOLERANCE); })
       .filter(function (path) { return path.length > 3; })
       .map(pathToSvg)
       .filter(Boolean);
     const marks = registrationMarks(dimensions);
-    const pathBody = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
+    const pathBody = paths.length ? `  <path d="${paths.join(' ')}" fill="black" fill-rule="evenodd" clip-rule="evenodd"/>` : '';
     const body = pathBody ? `${marks}\n${pathBody}` : marks;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}" viewBox="0 0 ${dimensions.width} ${dimensions.height}">\n${body}\n</svg>\n`;
   }
@@ -146,7 +204,7 @@
     downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
-  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
+  const api = { transparentPngUrl, downloadTransparentPng, traceMask, fitContour, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
   global.GoldExporters = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
