@@ -102,21 +102,31 @@
     return `${d} Z`;
   }
 
+  function svgCanvasDimensions(maskResult) {
+    return {
+      width: maskResult.originalWidth || maskResult.imageWidth || maskResult.width,
+      height: maskResult.originalHeight || maskResult.imageHeight || maskResult.height,
+    };
+  }
+
   function createSvg(maskResult) {
+    const dimensions = svgCanvasDimensions(maskResult);
     const paths = traceMask(maskResult.mask, maskResult.width, maskResult.height)
       .map(function (path) { return simplifyPath(path, VECTOR_SIMPLIFICATION_TOLERANCE); })
       .filter(function (path) { return path.length > 3; })
       .map(pathToSvg)
       .filter(Boolean);
-    const body = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${maskResult.width}" height="${maskResult.height}" viewBox="0 0 ${maskResult.width} ${maskResult.height}">\n${body}\n</svg>\n`;
+    const bounds = `  <rect x="0" y="0" width="${dimensions.width}" height="${dimensions.height}" fill="none" opacity="0" pointer-events="none"/>`;
+    const pathBody = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
+    const body = pathBody ? `${bounds}\n${pathBody}` : bounds;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}" viewBox="0 0 ${dimensions.width} ${dimensions.height}">\n${body}\n</svg>\n`;
   }
 
   function downloadSvg(maskResult, fileName) {
     downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
-  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, createSvg, downloadSvg };
+  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, svgCanvasDimensions, createSvg, downloadSvg };
   global.GoldExporters = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

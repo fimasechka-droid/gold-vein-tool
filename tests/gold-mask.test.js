@@ -35,7 +35,21 @@ for (let i = 0; i < veinResult.mask.length; i += 1) {
 const svg = createSvg(veinResult);
 assert.match(svg, /^<svg /, 'SVG should be generated');
 assert.match(svg, /<path /, 'SVG should contain vector paths');
-assert.doesNotMatch(svg, /<image|data:image\/png|<rect/i, 'SVG must not contain raster image or background rectangle');
-assert.match(svg, /viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
+assert.doesNotMatch(svg, /<image|data:image\/png/i, 'SVG must not contain raster image data');
+assert.match(svg, /width="7" height="3" viewBox="0 0 7 3"/, 'SVG should preserve original dimensions');
+assert.match(svg, /<rect x="0" y="0" width="7" height="3" fill="none" opacity="0" pointer-events="none"\/>/, 'SVG should include an invisible full-canvas bounds rectangle');
+assert.match(svg, /<path d="M 3 0/, 'SVG path coordinates should remain in the original canvas coordinate space');
+
+const sparseMask = {
+  width: 10,
+  height: 8,
+  originalWidth: 10,
+  originalHeight: 8,
+  mask: new Uint8Array(80),
+};
+sparseMask.mask[6 * sparseMask.width + 8] = 1;
+const sparseSvg = createSvg(sparseMask);
+assert.match(sparseSvg, /width="10" height="8" viewBox="0 0 10 8"/, 'SVG should use the full source canvas rather than the vein bounding box');
+assert.match(sparseSvg, /<rect x="0" y="0" width="10" height="8" fill="none" opacity="0" pointer-events="none"\/>/, 'empty canvas areas should remain transparent but preserved');
 
 console.log('Gold vein processing tests passed.');

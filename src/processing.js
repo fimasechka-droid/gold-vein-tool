@@ -231,6 +231,8 @@
     return {
       width,
       height,
+      originalWidth: width,
+      originalHeight: height,
       probability,
       rawMask,
       mask: finalMask,
