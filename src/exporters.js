@@ -1,6 +1,8 @@
 (function (global) {
-  const CONTOUR_FIT_TOLERANCE = 0.9;
-  const CURVE_HANDLE_SCALE = 0.22;
+  const CONTOUR_FIT_TOLERANCE = 1.15;
+  const CURVE_HANDLE_SCALE = 0.36;
+  const SHARP_CORNER_HANDLE_SCALE = 0.12;
+  const SHARP_CORNER_ANGLE_DEGREES = 100;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -179,6 +181,24 @@
     return Number(value.toFixed(3)).toString();
   }
 
+  function turnAngle(previous, current, next) {
+    const ax = previous[0] - current[0];
+    const ay = previous[1] - current[1];
+    const bx = next[0] - current[0];
+    const by = next[1] - current[1];
+    const aLength = Math.hypot(ax, ay);
+    const bLength = Math.hypot(bx, by);
+    if (!aLength || !bLength) return 180;
+    const cosine = clamp((ax * bx + ay * by) / (aLength * bLength), -1, 1);
+    return Math.acos(cosine) * (180 / Math.PI);
+  }
+
+  function handleScaleForTurn(angle) {
+    if (angle <= SHARP_CORNER_ANGLE_DEGREES) return SHARP_CORNER_HANDLE_SCALE;
+    const relaxed = (angle - SHARP_CORNER_ANGLE_DEGREES) / (180 - SHARP_CORNER_ANGLE_DEGREES);
+    return SHARP_CORNER_HANDLE_SCALE + (CURVE_HANDLE_SCALE - SHARP_CORNER_HANDLE_SCALE) * relaxed;
+  }
+
   function pathToSvg(points) {
     const source = removeDuplicateClosingPoint(points);
     if (source.length < 3) return '';
@@ -191,8 +211,12 @@
       const segmentLength = Math.hypot(next[0] - current[0], next[1] - current[1]);
       const incomingLength = Math.hypot(current[0] - previous[0], current[1] - previous[1]);
       const outgoingLength = Math.hypot(afterNext[0] - next[0], afterNext[1] - next[1]);
-      const handle1 = Math.min(segmentLength * CURVE_HANDLE_SCALE, incomingLength * CURVE_HANDLE_SCALE, segmentLength / 3);
-      const handle2 = Math.min(segmentLength * CURVE_HANDLE_SCALE, outgoingLength * CURVE_HANDLE_SCALE, segmentLength / 3);
+      const currentTurn = turnAngle(previous, current, next);
+      const nextTurn = turnAngle(current, next, afterNext);
+      const currentHandleScale = handleScaleForTurn(currentTurn);
+      const nextHandleScale = handleScaleForTurn(nextTurn);
+      const handle1 = Math.min(segmentLength * currentHandleScale, incomingLength * currentHandleScale, segmentLength / 3);
+      const handle2 = Math.min(segmentLength * nextHandleScale, outgoingLength * nextHandleScale, segmentLength / 3);
       const tangent1Length = Math.hypot(next[0] - previous[0], next[1] - previous[1]) || 1;
       const tangent2Length = Math.hypot(afterNext[0] - current[0], afterNext[1] - current[1]) || 1;
       const cp1 = clampToPoints([
