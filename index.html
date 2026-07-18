@@ -62,16 +62,28 @@
         <button class="preview-mode" type="button" data-preview="mask">Маска</button>
         <button class="preview-mode" type="button" data-preview="overlay">Наложение</button>
       </div>
+      <div class="zoom-toolbar" role="group" aria-label="Масштаб предпросмотра">
+        <span class="zoom-label">Масштаб: <output id="zoom-value">Fit</output></span>
+        <button class="zoom-control is-active" type="button" data-zoom="fit">Fit</button>
+        <button class="zoom-control" type="button" data-zoom="0.5">50%</button>
+        <button class="zoom-control" type="button" data-zoom="1">100%</button>
+        <button class="zoom-control" type="button" data-zoom="2">200%</button>
+        <button class="zoom-control" type="button" data-zoom="4">400%</button>
+      </div>
     </section>
 
     <section class="preview-grid" aria-label="Область предпросмотра">
       <figure class="panel preview-card">
         <figcaption id="preview-caption">Исходник</figcaption>
-        <canvas id="preview-canvas"></canvas>
+        <div class="preview-viewport" data-preview-viewport>
+          <canvas id="preview-canvas"></canvas>
+        </div>
       </figure>
       <figure class="panel preview-card">
         <figcaption>Маска для экспорта</figcaption>
-        <canvas id="mask-canvas"></canvas>
+        <div class="preview-viewport" data-preview-viewport>
+          <canvas id="mask-canvas"></canvas>
+        </div>
       </figure>
     </section>
   </main>
