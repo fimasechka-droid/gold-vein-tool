@@ -32,7 +32,10 @@ for (let i = 0; i < veinResult.mask.length; i += 1) {
   if (!veinResult.mask[i]) assert.equal(veinResult.transparentImageData.data[i * 4 + 3], 0, 'PNG background must be transparent');
 }
 
-const svg = createSvg(veinResult);
+let svg;
+assert.doesNotThrow(function () {
+  svg = createSvg(veinResult);
+}, ReferenceError, 'createSvg should complete without referencing deleted contour functions');
 assert.match(svg, /^<svg /, 'SVG should be generated');
 assert.match(svg, /<path /, 'SVG should contain vector paths');
 assert.doesNotMatch(svg, /<image|data:image\/png/i, 'SVG must not contain raster image data');
