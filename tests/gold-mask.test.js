@@ -32,7 +32,7 @@ for (let i = 0; i < veinResult.mask.length; i += 1) {
   if (!veinResult.mask[i]) assert.equal(veinResult.transparentImageData.data[i * 4 + 3], 0, 'PNG background must be transparent');
 }
 
-const svg = createSvg(veinResult, { vectorSmoothing: 35 });
+const svg = createSvg(veinResult);
 assert.match(svg, /^<svg /, 'SVG should be generated');
 assert.match(svg, /<path /, 'SVG should contain vector paths');
 assert.doesNotMatch(svg, /<image|data:image\/png|<rect/i, 'SVG must not contain raster image or background rectangle');
