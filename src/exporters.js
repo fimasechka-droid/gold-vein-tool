@@ -1,5 +1,6 @@
 (function (global) {
-  const VECTOR_SIMPLIFICATION_TOLERANCE = 0.63;
+  const VECTOR_SIMPLIFICATION_TOLERANCE = 0;
+  const CONTOUR_SMOOTHING_FACTOR = 0.18;
   function downloadBlob(content, fileName, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
     const link = document.createElement('a');
@@ -26,20 +27,30 @@
 
   function traceMask(mask, width, height) {
     const edges = new Map();
-    function addEdge(x1, y1, x2, y2) {
-      const key = `${x1},${y1}`;
+    function pointKey(point) { return `${point[0]},${point[1]}`; }
+    function addEdge(from, to) {
+      const key = pointKey(from);
       if (!edges.has(key)) edges.set(key, []);
-      edges.get(key).push([x2, y2]);
+      edges.get(key).push(to);
     }
     function has(x, y) { return x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x]; }
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         if (!has(x, y)) continue;
-        if (!has(x, y - 1)) addEdge(x, y, x + 1, y);
-        if (!has(x + 1, y)) addEdge(x + 1, y, x + 1, y + 1);
-        if (!has(x, y + 1)) addEdge(x + 1, y + 1, x, y + 1);
-        if (!has(x - 1, y)) addEdge(x, y + 1, x, y);
+
+        // Emit contour edges on the subpixel boundary between the foreground
+        // pixel center and neighbouring background pixel centers. This keeps
+        // coordinates in the original export space but avoids tracing the mask
+        // as filled square cells.
+        const left = x;
+        const right = x + 1;
+        const top = y;
+        const bottom = y + 1;
+        if (!has(x, y - 1)) addEdge([left, top], [right, top]);
+        if (!has(x + 1, y)) addEdge([right, top], [right, bottom]);
+        if (!has(x, y + 1)) addEdge([right, bottom], [left, bottom]);
+        if (!has(x - 1, y)) addEdge([left, bottom], [left, top]);
       }
     }
 
@@ -56,12 +67,35 @@
         const next = list.shift();
         if (!list.length) edges.delete(key);
         points.push(next);
-        key = `${next[0]},${next[1]}`;
+        key = pointKey(next);
         if (key === startKey) break;
       }
-      if (points.length > 3) paths.push(points);
+      if (points.length > 3) paths.push(smoothContour(points, CONTOUR_SMOOTHING_FACTOR));
     }
     return paths;
+  }
+
+  function smoothContour(points, factor) {
+    if (points.length <= 4 || factor <= 0) return points;
+    const closed = points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1];
+    const source = closed ? points.slice(0, -1) : points.slice();
+    const smoothed = [];
+    for (let i = 0; i < source.length; i += 1) {
+      const previous = source[(i - 1 + source.length) % source.length];
+      const current = source[i];
+      const next = source[(i + 1) % source.length];
+      const incoming = [
+        current[0] + (previous[0] - current[0]) * factor,
+        current[1] + (previous[1] - current[1]) * factor,
+      ];
+      const outgoing = [
+        current[0] + (next[0] - current[0]) * factor,
+        current[1] + (next[1] - current[1]) * factor,
+      ];
+      smoothed.push(incoming, outgoing);
+    }
+    if (closed) smoothed.push(smoothed[0]);
+    return smoothed;
   }
 
   function perpendicularDistance(point, start, end) {
@@ -95,10 +129,22 @@
     return simplified;
   }
 
+  function formatNumber(value) {
+    return Number(value.toFixed(3)).toString();
+  }
+
   function pathToSvg(points) {
     if (points.length < 3) return '';
-    let d = `M ${points[0][0]} ${points[0][1]}`;
-    for (let i = 1; i < points.length; i += 1) d += ` L ${points[i][0]} ${points[i][1]}`;
+    let d = `M ${formatNumber(points[0][0])} ${formatNumber(points[0][1])}`;
+    for (let i = 1; i < points.length - 1; i += 2) {
+      const control = points[i];
+      const end = points[i + 1];
+      d += ` Q ${formatNumber(control[0])} ${formatNumber(control[1])} ${formatNumber(end[0])} ${formatNumber(end[1])}`;
+    }
+    if (points.length % 2 === 0) {
+      const last = points[points.length - 1];
+      d += ` L ${formatNumber(last[0])} ${formatNumber(last[1])}`;
+    }
     return `${d} Z`;
   }
 
@@ -137,7 +183,7 @@
       .map(pathToSvg)
       .filter(Boolean);
     const marks = registrationMarks(dimensions);
-    const pathBody = paths.map(function (d) { return `  <path d="${d}" fill="black"/>`; }).join('\n');
+    const pathBody = paths.length ? `  <path d="${paths.join(' ')}" fill="black" fill-rule="evenodd" clip-rule="evenodd"/>` : '';
     const body = pathBody ? `${marks}\n${pathBody}` : marks;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}" viewBox="0 0 ${dimensions.width} ${dimensions.height}">\n${body}\n</svg>\n`;
   }
@@ -146,7 +192,7 @@
     downloadBlob(createSvg(maskResult), fileName, 'image/svg+xml;charset=utf-8');
   }
 
-  const api = { transparentPngUrl, downloadTransparentPng, traceMask, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
+  const api = { transparentPngUrl, downloadTransparentPng, traceMask, smoothContour, simplifyPath, svgCanvasDimensions, registrationMarks, createSvg, downloadSvg };
   global.GoldExporters = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
